@@ -5,7 +5,7 @@
  */
 
 import classNames from "classnames";
-import { ModifierFn } from "popper.js";
+import { ModifierFn, ReferenceObject } from "popper.js";
 import * as React from "react";
 import { Manager, Popper, PopperChildrenProps, Reference, ReferenceChildrenProps } from "react-popper";
 
@@ -74,6 +74,15 @@ export interface IPopoverProps extends IPopoverSharedProps {
      * provided as the _first_ element in `children`.
      */
     target?: string | JSX.Element;
+
+    /**
+     * ClientRect to specify a virtual target for the popover container.
+     * If present, the referenceElementRect will override positions derived
+     * from target and position properties.
+     * See https://www.npmjs.com/package/react-popper#usage-without-a-reference-htmlelement.
+     */
+
+    referenceElementRect?: ClientRect;
 }
 
 export interface IPopoverState {
@@ -180,13 +189,7 @@ export class Popover extends AbstractPureComponent<IPopoverProps, IPopoverState>
                         usePortal={this.props.usePortal}
                         portalContainer={this.props.portalContainer}
                     >
-                        <Popper
-                            innerRef={this.refHandlers.popover}
-                            placement={positionToPlacement(this.props.position)}
-                            modifiers={this.getPopperModifiers()}
-                        >
-                            {this.renderPopover}
-                        </Popper>
+                        {this.renderPopper()}
                     </Overlay>
                 </WrapperTagName>
             </Manager>
@@ -260,6 +263,32 @@ export class Popover extends AbstractPureComponent<IPopoverProps, IPopoverState>
         if (this.props.usePortal && this.state.isOpen) {
             const hasDarkParent = this.targetElement != null && this.targetElement.closest(`.${Classes.DARK}`) != null;
             this.setState({ hasDarkParent });
+        }
+    }
+
+    private renderPopper() {
+        const refElement = this.getReferenceElement();
+        if (refElement) {
+            return (
+                <Popper
+                    innerRef={this.refHandlers.popover}
+                    placement={positionToPlacement(this.props.position)}
+                    modifiers={this.getPopperModifiers()}
+                    referenceElement={refElement}
+                >
+                    {this.renderPopover}
+                </Popper>
+            );
+        } else {
+            return (
+                <Popper
+                    innerRef={this.refHandlers.popover}
+                    placement={positionToPlacement(this.props.position)}
+                    modifiers={this.getPopperModifiers()}
+                >
+                    {this.renderPopover}
+                </Popper>
+            );
         }
     }
 
@@ -392,6 +421,19 @@ export class Popover extends AbstractPureComponent<IPopoverProps, IPopoverState>
                 order: 900,
             },
         };
+    }
+
+    private getReferenceElement(): ReferenceObject | undefined {
+        const { referenceElementRect } = this.props;
+        if (referenceElementRect != null) {
+            const getBoundingClientRect = () => referenceElementRect;
+            return {
+                clientHeight: getBoundingClientRect().height,
+                clientWidth: getBoundingClientRect().width,
+                getBoundingClientRect,
+            };
+        }
+        return undefined;
     }
 
     private handleTargetFocus = (e: React.FocusEvent<HTMLElement>) => {
